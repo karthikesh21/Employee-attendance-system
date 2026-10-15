@@ -1,6 +1,6 @@
 # Employee Attendance & Analytics API
 
-A high-performance, production-quality REST API built with FastAPI and MongoDB for employee attendance tracking, regularization lifecycle management, and analytics (leaderboards, monthly summaries, and department trends).
+A REST API built with FastAPI and MongoDB for employee attendance tracking, regularization lifecycle management, and analytics (leaderboards, monthly summaries, and department trends).
 
 ## 1. Project Overview
 
@@ -8,7 +8,7 @@ This API manages the complete attendance lifecycle for organizations:
 - **Employee Management**: Register employees with configurable shifts (including overnight shifts) and list employees with pagination.
 - **Attendance Lifecycle**: Race-safe punch-in, punch-out with overtime, work hour, and half-day computations, and auditable regularizations (manual corrections).
 - **Analytics Engine**: Native MongoDB aggregation pipelines computing monthly employee summaries, department cross-collection aggregates, latecomer competition leaderboards with window functions, and daily moving averages with gap-filling (`$densify`).
-- **Explain Endpoint**: Production query execution plan introspection (`executionStats`) ensuring query paths leverage index scans (`IXSCAN`) without collection scans (`COLLSCAN`).
+- **Explain Endpoint**: Query execution plan introspection (`executionStats`) validating index scans (`IXSCAN`) across query paths.
 
 ## 2. Prerequisites
 
@@ -19,7 +19,8 @@ This API manages the complete attendance lifecycle for organizations:
 
 1. Clone the repository and navigate into the root directory:
    ```bash
-   cd HR_One
+   git clone https://github.com/karthikesh21/Employee-attendance-system.git
+   cd Employee-attendance-system
    ```
 
 2. Create and activate a Python 3.11 virtual environment:
@@ -60,22 +61,23 @@ $env:MONGO_DB = "attendance_db"
 ## 5. How to Start MongoDB
 
 - **Docker**:
-  ```bash
-  docker run -d --name mongo7 -p 27017:27017 mongo:7
-  ```
+   ```bash
+   docker run -d --name mongo7 -p 27017:27017 mongo:7
+   ```
 - **Local MongoDB**:
-  ```bash
-  mongod --dbpath <path_to_data_dir> --port 27017
-  ```
+   ```bash
+   mongod --dbpath <path_to_data_dir> --port 27017
+   ```
 - **MongoDB Atlas**:
-  Provide your Atlas connection string via `MONGO_URI`.
+   Provide your Atlas connection string via `MONGO_URI`.
 
-## 6. How to Seed the Sample Data
+## 6. Database Initialization & Indexing
 
-To load the sample employee records and attendance logs into MongoDB:
-```bash
-python sample_seed.py
-```
+The application manages database indexes automatically on startup. During application lifespan startup, `ensure_indexes()` creates all required unique constraints and compound indexes idempotently:
+- `employees`: Unique index on `emp_code`, compound index on `(department, joined_on)`.
+- `attendance_logs`: Unique compound index on `(emp_code, date)`, compound index on `(date desc, emp_code asc)`, index on `(emp_code, punch_in desc)`, and index on `(date, late_minutes desc)`.
+
+No manual database initialization or migration script is required. Pointing the application to a running MongoDB instance via `MONGO_URI` and starting the server initializes all necessary indexes. Data records are created and managed directly through the REST API endpoints.
 
 ## 7. How to Run the FastAPI Application
 
@@ -96,7 +98,11 @@ Once the application is running, access interactive OpenAPI documentation and te
 
 ## 9. How to Run Tests
 
-Execute the comprehensive automated test suite using `pytest`:
+The test suite is located in `tests/test_api.py` and exercises all API endpoints, business logic rules (R1–R8), concurrency handling, error responses, and database execution plans (`IXSCAN`).
+
+Tests run against the MongoDB instance specified in `MONGO_URI` and `MONGO_DB` (defaulting to `attendance_db` on `mongodb://localhost:27017`). Ensure MongoDB is accessible before running tests.
+
+Run tests using `pytest` within the activated virtual environment:
 ```bash
 pytest -v
 ```
